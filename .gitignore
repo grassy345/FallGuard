@@ -1,0 +1,45 @@
+# ============================================
+# Android .gitignore
+# ============================================
+
+# --- Build outputs ---
+*.apk
+*.aab
+*.ap_
+*.dex
+/build/
+/app/build/
+
+# --- Gradle ---
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+local.properties
+
+# --- IDE files (Android Studio / IntelliJ) ---
+.idea/
+*.iml
+*.iws
+*.ipr
+.navigation/
+captures/
+
+# --- OS generated files ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Firebase credentials (SENSITIVE — never commit!) ---
+google-services.json
+
+# --- Logs ---
+*.log
+
+# --- Kotlin ---
+*.kotlin_module
+
+# --- Misc ---
+*.jks
+*.keystore

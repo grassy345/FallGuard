@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- activity_main.xml — The Main Screen Layout -->
+<!-- This is like your activity_main.xml in Android Studio that you're familiar with! -->
+<!-- For Feature 1, it's simple: just a status message in the center of the screen -->
+<!-- This will become a full dashboard in Feature 5 -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="32dp"
+    android:background="@color/background">
+
+    <!-- App name -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/app_name"
+        android:textSize="32sp"
+        android:textColor="@color/primary"
+        android:textStyle="bold"
+        android:layout_marginBottom="32dp" />
+
+    <!-- Status text — updated by MainActivity.kt -->
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Starting monitoring service..."
+        android:textSize="18sp"
+        android:textColor="@color/text_primary"
+        android:textAlignment="center"
+        android:lineSpacingExtra="6dp" />
+
+</LinearLayout>
