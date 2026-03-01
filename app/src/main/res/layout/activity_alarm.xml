@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- activity_alarm.xml — Full-Screen Alarm Layout -->
+<!-- This is the emergency alarm screen that takes over the entire phone -->
+<!-- Background color is set dynamically: RED for FALL_DETECTED, AMBER for SUSPICIOUS -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/alarmBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="32dp"
+    android:background="@color/alert_red">
+
+    <!-- Alert type icon area -->
+    <TextView
+        android:id="@+id/alertIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🚨"
+        android:textSize="72sp"
+        android:layout_marginBottom="24dp" />
+
+    <!-- Main alert text: "FALL DETECTED!" or "SUSPICIOUS ACTIVITY" -->
+    <TextView
+        android:id="@+id/alertTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="FALL DETECTED!"
+        android:textSize="36sp"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:textAlignment="center"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Relative timestamp: "Just now", "1 minute ago", etc. -->
+    <TextView
+        android:id="@+id/relativeTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Just now"
+        android:textSize="24sp"
+        android:textColor="#FFFFFFCC"
+        android:textAlignment="center"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Exact timestamp from the Python backend -->
+    <TextView
+        android:id="@+id/exactTimestamp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="01-03-2026 15:01:37"
+        android:textSize="18sp"
+        android:textColor="#FFFFFF99"
+        android:textAlignment="center"
+        android:layout_marginBottom="48dp" />
+
+    <!-- Big ACKNOWLEDGE button -->
+    <Button
+        android:id="@+id/acknowledgeButton"
+        android:layout_width="280dp"
+        android:layout_height="80dp"
+        android:text="ACKNOWLEDGE"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary"
+        android:backgroundTint="@color/white"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Subtle hint text -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Press to stop alarm and confirm you have seen this alert"
+        android:textSize="14sp"
+        android:textColor="#FFFFFF88"
+        android:textAlignment="center" />
+
+</LinearLayout>

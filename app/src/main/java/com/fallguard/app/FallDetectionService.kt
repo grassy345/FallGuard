@@ -19,29 +19,27 @@ import com.google.firebase.database.ValueEventListener
  * FallDetectionService — The Heart of FallGuard
  *
  * This is a "foreground service" that runs silently in the background 24/7.
- * 
+ *
  * What it does:
  * 1. Shows a persistent notification saying "FallGuard is monitoring..."
- *    (Android requires this for services that run in the background)
  * 2. Connects to Firebase Realtime Database
  * 3. Listens for changes to the "fall_status" field
- * 4. When a fall is detected, it logs the event (Feature 2 will add alarms)
- *
- * Why a FOREGROUND service?
- * - Regular background services get killed by Android to save battery
- * - Foreground services show a persistent notification and Android keeps them alive
- * - This is perfect for our use case: we need to ALWAYS be listening
- *
- * What is START_STICKY?
- * - If Android kills the service (low memory), START_STICKY tells it to restart it
- * - This means our monitoring comes back automatically
+ * 4. When FALL_DETECTED or SUSPICIOUS: launches AlarmActivity (full-screen alarm)
+ * 5. When NORMAL: cancels any active alert notifications
  */
 class FallDetectionService : Service() {
 
     companion object {
         private const val TAG = "FallDetectionService"
-        private const val CHANNEL_ID = "fall_guard_monitoring"
-        private const val NOTIFICATION_ID = 1
+
+        // Notification channels
+        private const val MONITORING_CHANNEL_ID = "fall_guard_monitoring"
+        private const val ALERT_CHANNEL_ID = "fall_guard_alerts"
+
+        // Notification IDs
+        private const val MONITORING_NOTIFICATION_ID = 1
+        private const val ALERT_NOTIFICATION_ID = 2
+
         private const val FIREBASE_PATH = "fall_alert"
     }
 
@@ -51,19 +49,19 @@ class FallDetectionService : Service() {
     // Firebase listener reference — we keep this so we can remove it when service stops
     private var firebaseListener: ValueEventListener? = null
 
-    /**
-     * Called when the service is first created.
-     * We set up the notification channel and start listening to Firebase here.
-     */
+    // Track the last status to avoid re-triggering for the same event
+    private var lastFallStatus: String? = null
+
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "FallDetectionService created")
 
-        // Create the notification channel (required on Android 8.0+)
-        createNotificationChannel()
+        // Create both notification channels
+        createMonitoringChannel()
+        createAlertChannel()
 
         // Start as a foreground service with a persistent notification
-        startForeground(NOTIFICATION_ID, createMonitoringNotification())
+        startForeground(MONITORING_NOTIFICATION_ID, createMonitoringNotification())
 
         // Acquire a wake lock to keep CPU awake
         acquireWakeLock()
@@ -72,29 +70,47 @@ class FallDetectionService : Service() {
         startFirebaseListener()
     }
 
-    /**
-     * Called when the service is started (or restarted by the system).
-     * START_STICKY means: "If I get killed, restart me!"
-     */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "FallDetectionService started")
         return START_STICKY
     }
 
     /**
-     * Creates a notification channel.
-     *
-     * Think of a notification channel like a "category" for notifications.
-     * Android lets users control each channel separately.
-     * This channel is for the persistent "monitoring" notification.
+     * Creates the persistent monitoring notification channel.
+     * Low importance = no sound, just shows in notification bar quietly.
      */
-    private fun createNotificationChannel() {
+    private fun createMonitoringChannel() {
         val channel = NotificationChannel(
-            CHANNEL_ID,
+            MONITORING_CHANNEL_ID,
             "Fall Detection Monitoring",
-            NotificationManager.IMPORTANCE_LOW  // Low importance = no sound, just shows in notification bar
+            NotificationManager.IMPORTANCE_LOW
         ).apply {
             description = "Persistent notification showing FallGuard is actively monitoring"
+        }
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager.createNotificationChannel(channel)
+    }
+
+    /**
+     * Creates the HIGH IMPORTANCE alert notification channel.
+     * This channel:
+     * - Bypasses Do Not Disturb
+     * - Shows as a heads-up notification
+     * - Can show full-screen intents (our AlarmActivity)
+     * - NO sound — AlarmActivity handles the alarm audio to avoid double alarm
+     */
+    private fun createAlertChannel() {
+        val channel = NotificationChannel(
+            ALERT_CHANNEL_ID,
+            "Fall Alerts",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Emergency fall detection alerts — these bypass Do Not Disturb"
+            setBypassDnd(true)
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 1000, 500, 1000, 500, 1000)
+            setSound(null, null)  // Silent! AlarmActivity plays the alarm sound instead
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
 
         val notificationManager = getSystemService(NotificationManager::class.java)
@@ -103,10 +119,8 @@ class FallDetectionService : Service() {
 
     /**
      * Creates the persistent "FallGuard is monitoring..." notification.
-     * This notification stays visible as long as the service is running.
      */
     private fun createMonitoringNotification(): Notification {
-        // When the user taps the notification, open the main screen
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -114,50 +128,35 @@ class FallDetectionService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        return NotificationCompat.Builder(this, MONITORING_CHANNEL_ID)
             .setContentTitle("FallGuard Active")
             .setContentText("Monitoring for fall alerts...")
-            .setSmallIcon(android.R.drawable.ic_menu_view)  // Temporary icon, will replace later
+            .setSmallIcon(android.R.drawable.ic_menu_view)
             .setContentIntent(pendingIntent)
-            .setOngoing(true)  // Can't be swiped away
+            .setOngoing(true)
             .build()
     }
 
-    /**
-     * Keeps the CPU awake so we can receive Firebase updates even when the phone screen is off.
-     */
     private fun acquireWakeLock() {
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
             "FallGuard::MonitoringWakeLock"
         ).apply {
-            acquire()  // Keep CPU awake indefinitely (released when service stops)
+            acquire()
         }
     }
 
     /**
      * THE MOST IMPORTANT FUNCTION — Listens to Firebase Realtime Database.
-     *
-     * This connects to Firebase at the path "fall_alert" and listens for ANY changes.
-     * When the Python backend writes something like:
-     *   { "fall_status": "FALL_DETECTED", "timestamp": "...", "acknowledged": false }
-     * ...this function gets called with the new data.
-     *
-     * For Feature 1, we just LOG the change.
-     * Feature 2 will add push notifications and alarms.
+     * Now triggers actual alarms instead of just logging!
      */
     private fun startFirebaseListener() {
         val database = FirebaseDatabase.getInstance()
         val fallAlertRef = database.getReference(FIREBASE_PATH)
 
         firebaseListener = object : ValueEventListener {
-            /**
-             * Called whenever data at "fall_alert" changes in Firebase.
-             * This is triggered in real-time — the moment the Python backend writes data.
-             */
             override fun onDataChange(snapshot: DataSnapshot) {
-                // Read the values from Firebase
                 val fallStatus = snapshot.child("fall_status").getValue(String::class.java)
                 val timestamp = snapshot.child("timestamp").getValue(String::class.java)
                 val acknowledged = snapshot.child("acknowledged").getValue(Boolean::class.java)
@@ -169,49 +168,113 @@ class FallDetectionService : Service() {
                 Log.d(TAG, "  acknowledged: $acknowledged")
                 Log.d(TAG, "═══════════════════════════════════════════")
 
-                // React to fall detection
+                // Don't trigger alarm if already acknowledged
+                if (acknowledged == true) {
+                    Log.d(TAG, "Alert already acknowledged — skipping alarm")
+                    return
+                }
+
+                // Don't re-trigger for the same status
+                if (fallStatus == lastFallStatus) {
+                    Log.d(TAG, "Same status as before ($fallStatus) — skipping duplicate")
+                    return
+                }
+                lastFallStatus = fallStatus
+
+                // React based on fall status
                 when (fallStatus) {
                     "FALL_DETECTED" -> {
-                        Log.w(TAG, "⚠️ FALL DETECTED! Alert should trigger here (Feature 2)")
-                        // Feature 2 will add: trigger alarm, show notification
+                        Log.w(TAG, "🚨 FALL DETECTED! Launching AlarmActivity!")
+                        launchAlarmActivity("FALL_DETECTED", timestamp ?: "")
                     }
                     "SUSPICIOUS" -> {
-                        Log.w(TAG, "⚠️ SUSPICIOUS activity detected! (Feature 2)")
-                        // Feature 2 will add: trigger warning notification
+                        Log.w(TAG, "⚠️ SUSPICIOUS activity! Launching AlarmActivity!")
+                        launchAlarmActivity("SUSPICIOUS", timestamp ?: "")
+                    }
+                    "NORMAL" -> {
+                        Log.d(TAG, "✅ Status is NORMAL — cancelling any active alerts")
+                        cancelAlertNotification()
                     }
                     else -> {
-                        Log.d(TAG, "Status is normal or unknown: $fallStatus")
+                        Log.d(TAG, "Unknown status: $fallStatus")
                     }
                 }
             }
 
-            /**
-             * Called if Firebase can't be reached (no internet, etc.)
-             */
             override fun onCancelled(error: DatabaseError) {
                 Log.e(TAG, "Firebase listener cancelled: ${error.message}")
             }
         }
 
-        // Attach the listener — Firebase will now notify us of ANY changes
         fallAlertRef.addValueEventListener(firebaseListener!!)
         Log.d(TAG, "Firebase listener attached at path: $FIREBASE_PATH")
     }
 
     /**
-     * Called when the service is destroyed (stopped).
-     * Clean up: remove Firebase listener, release wake lock.
+     * Launches the full-screen AlarmActivity.
+     * Also posts a high-priority notification with a full-screen intent
+     * (this is what wakes up the phone and shows over the lock screen).
      */
+    private fun launchAlarmActivity(alertType: String, timestamp: String) {
+        // Create the intent for AlarmActivity
+        val alarmIntent = Intent(this, AlarmActivity::class.java).apply {
+            putExtra(AlarmActivity.EXTRA_ALERT_TYPE, alertType)
+            putExtra(AlarmActivity.EXTRA_TIMESTAMP, timestamp)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)          // Required when starting activity from a service
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)         // Close any existing alarm activity
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)        // Don't create duplicates
+        }
+
+        // Full-screen intent PendingIntent — Android uses this to show over lock screen
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            alarmIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Determine notification title and text based on alert type
+        val title = if (alertType == "FALL_DETECTED") "🚨 FALL DETECTED!" else "⚠️ SUSPICIOUS ACTIVITY"
+        val text = "Tap to view alert — $timestamp"
+
+        // Build the high-priority notification with full-screen intent
+        val notification = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(fullScreenPendingIntent, true)  // This shows over lock screen!
+            .setAutoCancel(true)
+            .build()
+
+        // Post the notification — Android will automatically launch AlarmActivity
+        // because of the fullScreenIntent
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager.notify(ALERT_NOTIFICATION_ID, notification)
+
+        // Also directly start the activity (belt and suspenders approach)
+        startActivity(alarmIntent)
+
+        Log.d(TAG, "AlarmActivity launched for: $alertType")
+    }
+
+    /**
+     * Cancels any active alert notification (when status returns to NORMAL).
+     */
+    private fun cancelAlertNotification() {
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager.cancel(ALERT_NOTIFICATION_ID)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "FallDetectionService destroyed")
 
-        // Remove the Firebase listener
         firebaseListener?.let {
             FirebaseDatabase.getInstance().getReference(FIREBASE_PATH).removeEventListener(it)
         }
 
-        // Release the wake lock
         wakeLock?.let {
             if (it.isHeld) {
                 it.release()
@@ -219,10 +282,6 @@ class FallDetectionService : Service() {
         }
     }
 
-    /**
-     * We don't support binding to this service (it's a started service, not bound).
-     * This is required by Android but we just return null.
-     */
     override fun onBind(intent: Intent?): IBinder? {
         return null
     }

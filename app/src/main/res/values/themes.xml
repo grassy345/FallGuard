@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- themes.xml — The app's visual theme -->
-<!-- This tells Android: "Use Material Design with our deep blue color scheme" -->
+<!-- themes.xml — The app's visual themes -->
 <resources>
+    <!-- Main app theme — deep blue, professional look -->
     <style name="Theme.FallGuard" parent="Theme.MaterialComponents.Light.NoActionBar">
-        <!-- Primary brand color -->
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/primary_dark</item>
         <item name="colorOnPrimary">@color/white</item>
-
-        <!-- Status bar color (top bar of the phone) -->
         <item name="android:statusBarColor">@color/primary_dark</item>
+    </style>
+
+    <!-- Alarm theme — fullscreen, no action bar, immersive -->
+    <!-- Used by AlarmActivity for the emergency alarm screen -->
+    <style name="Theme.FallGuard.Alarm" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 </resources>

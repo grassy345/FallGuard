@@ -28,6 +28,12 @@
     <!-- Keep CPU awake when processing alerts -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Show full-screen alarm over lock screen -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!-- Override Do Not Disturb mode for emergency alerts -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -45,6 +51,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- === ALARM SCREEN === -->
+        <!-- Full-screen emergency alarm that shows over the lock screen -->
+        <activity
+            android:name=".AlarmActivity"
+            android:exported="false"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:showWhenLocked="true"
+            android:theme="@style/Theme.FallGuard.Alarm"
+            android:launchMode="singleTop"
+            android:excludeFromRecents="true" />
 
         <!-- === BACKGROUND MONITORING SERVICE === -->
         <!-- This runs silently in the background, listening for fall alerts -->
