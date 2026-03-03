@@ -14,6 +14,8 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 /**
  * FallDetectionService — The Heart of FallGuard
@@ -169,8 +171,10 @@ class FallDetectionService : Service() {
                 Log.d(TAG, "═══════════════════════════════════════════")
 
                 // Don't trigger alarm if already acknowledged
+                // BUT: reset lastFallStatus so the NEXT event (even same status) will trigger
                 if (acknowledged == true) {
-                    Log.d(TAG, "Alert already acknowledged — skipping alarm")
+                    Log.d(TAG, "Alert already acknowledged — resetting lastFallStatus and skipping")
+                    lastFallStatus = null  // Reset! So next FALL_DETECTED won't be blocked as duplicate
                     return
                 }
 
@@ -212,51 +216,69 @@ class FallDetectionService : Service() {
 
     /**
      * Launches the full-screen AlarmActivity.
-     * Also posts a high-priority notification with a full-screen intent
-     * (this is what wakes up the phone and shows over the lock screen).
+     * ALWAYS launches the activity directly (screen on or off).
+     * Posts a quiet notification in the tray for reference only.
      */
     private fun launchAlarmActivity(alertType: String, timestamp: String) {
-        // Create the intent for AlarmActivity
+        // Step 1: Wake up the screen if it's off
+        val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+        val screenWakeLock = powerManager.newWakeLock(
+            PowerManager.FULL_WAKE_LOCK
+                or PowerManager.ACQUIRE_CAUSES_WAKEUP
+                or PowerManager.ON_AFTER_RELEASE,
+            "FallGuard::AlarmWakeLock"
+        )
+        screenWakeLock.acquire(30_000)  // Keep screen on for 30 seconds
+
+        // Step 2: Create intent for AlarmActivity
         val alarmIntent = Intent(this, AlarmActivity::class.java).apply {
             putExtra(AlarmActivity.EXTRA_ALERT_TYPE, alertType)
             putExtra(AlarmActivity.EXTRA_TIMESTAMP, timestamp)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)          // Required when starting activity from a service
-            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)         // Close any existing alarm activity
-            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)        // Don't create duplicates
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
         }
 
-        // Full-screen intent PendingIntent — Android uses this to show over lock screen
-        val fullScreenPendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            alarmIntent,
+        // Step 3: Launch the activity DIRECTLY — this is the ONLY way we show the alarm
+        startActivity(alarmIntent)
+        Log.d(TAG, "AlarmActivity launched directly for: $alertType")
+
+        // Step 4: Post a QUIET notification in the tray (reference only, no sound, no heads-up)
+        val tapIntent = PendingIntent.getActivity(
+            this, 0, alarmIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Determine notification title and text based on alert type
         val title = if (alertType == "FALL_DETECTED") "🚨 FALL DETECTED!" else "⚠️ SUSPICIOUS ACTIVITY"
-        val text = "Tap to view alert — $timestamp"
+        val displayTime = formatTimestamp(timestamp)
 
-        // Build the high-priority notification with full-screen intent
-        val notification = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(this, MONITORING_CHANNEL_ID)  // Low priority channel!
             .setContentTitle(title)
-            .setContentText(text)
+            .setContentText("Tap to view alert — $displayTime")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setFullScreenIntent(fullScreenPendingIntent, true)  // This shows over lock screen!
-            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)  // No heads-up, no interference
+            .setContentIntent(tapIntent)
+            .setOngoing(true)
             .build()
 
-        // Post the notification — Android will automatically launch AlarmActivity
-        // because of the fullScreenIntent
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.notify(ALERT_NOTIFICATION_ID, notification)
+    }
 
-        // Also directly start the activity (belt and suspenders approach)
-        startActivity(alarmIntent)
-
-        Log.d(TAG, "AlarmActivity launched for: $alertType")
+    /**
+     * Reformats the Python backend timestamp for display.
+     * Input:  "01-03-2026 15:01:37" → Output: "01/03/2026 03:01:37 PM"
+     */
+    private fun formatTimestamp(timestamp: String): String {
+        return try {
+            val inputFormat = SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault())
+            val outputFormat = SimpleDateFormat("dd/MM/yyyy hh:mm:ss a", Locale.US)
+            val date = inputFormat.parse(timestamp)
+            if (date != null) outputFormat.format(date).uppercase() else timestamp
+        } catch (e: Exception) {
+            timestamp  // Fallback to raw timestamp
+        }
     }
 
     /**

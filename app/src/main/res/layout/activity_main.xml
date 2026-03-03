@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- activity_main.xml — The Main Screen Layout -->
-<!-- This is like your activity_main.xml in Android Studio that you're familiar with! -->
-<!-- For Feature 1, it's simple: just a status message in the center of the screen -->
-<!-- This will become a full dashboard in Feature 5 -->
+<!-- activity_main.xml — The Main Dashboard Screen -->
+<!-- Shows monitoring status, logged-in user info, and logout button -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -20,6 +18,16 @@
         android:textSize="32sp"
         android:textColor="@color/primary"
         android:textStyle="bold"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Logged in as email -->
+    <TextView
+        android:id="@+id/userEmail"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Logged in as: ..."
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary"
         android:layout_marginBottom="32dp" />
 
     <!-- Status text — updated by MainActivity.kt -->
@@ -31,6 +39,17 @@
         android:textSize="18sp"
         android:textColor="@color/text_primary"
         android:textAlignment="center"
-        android:lineSpacingExtra="6dp" />
+        android:lineSpacingExtra="6dp"
+        android:layout_marginBottom="48dp" />
+
+    <!-- Logout button -->
+    <Button
+        android:id="@+id/logoutButton"
+        android:layout_width="200dp"
+        android:layout_height="48dp"
+        android:text="LOG OUT"
+        android:textSize="16sp"
+        android:backgroundTint="@color/alert_red"
+        android:textColor="@color/white" />
 
 </LinearLayout>

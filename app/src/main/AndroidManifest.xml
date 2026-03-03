@@ -34,6 +34,9 @@
     <!-- Override Do Not Disturb mode for emergency alerts -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
+    <!-- Display alarm over other apps (required on Android 10+ for reliable alarm display) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -41,16 +44,29 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FallGuard">
 
-        <!-- === MAIN SCREEN === -->
-        <!-- This is the screen that opens when you tap the app icon -->
+        <!-- === LOGIN SCREEN (new launcher) === -->
+        <!-- First screen when the app opens — must log in before monitoring -->
         <activity
-            android:name=".MainActivity"
-            android:exported="true">
+            android:name=".LoginActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FallGuard.Alarm">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- === REGISTER SCREEN === -->
+        <activity
+            android:name=".RegisterActivity"
+            android:exported="false"
+            android:theme="@style/Theme.FallGuard.Alarm" />
+
+        <!-- === MAIN SCREEN (dashboard) === -->
+        <!-- Only accessible after login — starts the monitoring service -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false" />
 
         <!-- === ALARM SCREEN === -->
         <!-- Full-screen emergency alarm that shows over the lock screen -->

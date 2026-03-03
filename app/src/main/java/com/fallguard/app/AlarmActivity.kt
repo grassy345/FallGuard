@@ -52,8 +52,11 @@ class AlarmActivity : AppCompatActivity() {
         const val EXTRA_ALERT_TYPE = "alert_type"        // "FALL_DETECTED" or "SUSPICIOUS"
         const val EXTRA_TIMESTAMP = "timestamp"           // "01-03-2026 15:01:37"
 
-        // Timestamp format from the Python backend
+        // Timestamp format from the Python backend (input)
         private const val TIMESTAMP_FORMAT = "dd-MM-yyyy HH:mm:ss"
+
+        // Display format: DD/MM/YYYY hh:mm:ss AM/PM
+        private const val DISPLAY_FORMAT = "dd/MM/yyyy hh:mm:ss a"
     }
 
     // MediaPlayer for the alarm sound
@@ -138,8 +141,8 @@ class AlarmActivity : AppCompatActivity() {
             alertTitle.text = "SUSPICIOUS ACTIVITY"
         }
 
-        // Show the exact timestamp from the Python backend
-        exactTimestamp.text = timestamp
+        // Show the exact timestamp — reformatted as DD/MM/YYYY hh:mm:ss AM/PM
+        exactTimestamp.text = formatDisplayTimestamp(timestamp)
     }
 
     /**
@@ -278,6 +281,25 @@ class AlarmActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse timestamp: $timestamp — ${e.message}")
             null
+        }
+    }
+
+    /**
+     * Reformats the Python backend timestamp for a friendlier display.
+     * Input:  "01-03-2026 15:01:37" (DD-MM-YYYY HH:MM:SS)
+     * Output: "01/03/2026 03:01:37 PM" (DD/MM/YYYY hh:mm:ss AM/PM)
+     */
+    private fun formatDisplayTimestamp(timestamp: String): String {
+        return try {
+            val parsedDate = parseTimestamp(timestamp)
+            if (parsedDate != null) {
+                val displayFormat = SimpleDateFormat(DISPLAY_FORMAT, Locale.US)
+                displayFormat.format(parsedDate).uppercase()
+            } else {
+                timestamp
+            }
+        } catch (e: Exception) {
+            timestamp
         }
     }
 

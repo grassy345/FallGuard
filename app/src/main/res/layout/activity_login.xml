@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- activity_login.xml — The Login Screen -->
+<!-- Beautiful login page with background image, FallGuard branding, and email/password fields -->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Background image — fills the entire screen -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/login_background"
+        android:scaleType="centerCrop"
+        android:contentDescription="Background" />
+
+    <!-- Semi-transparent dark overlay so text is readable over the image -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#88000000" />
+
+    <!-- Main content — centered login form -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:padding="32dp"
+            android:layout_gravity="center">
+
+            <!-- Spacer to push content down a bit -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- App Icon -->
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@mipmap/ic_launcher"
+                android:contentDescription="FallGuard Logo"
+                android:layout_marginBottom="16dp" />
+
+            <!-- App Name -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FallGuard"
+                android:textSize="36sp"
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <!-- Tagline -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Protecting Those Who Matter"
+                android:textSize="16sp"
+                android:textColor="#CCCCCC"
+                android:layout_marginBottom="48dp" />
+
+            <!-- Email field -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:hint="Email"
+                android:textColorHint="#AAAAAA"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/emailInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textEmailAddress"
+                    android:textColor="@color/white"
+                    android:textSize="16sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Password field -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:hint="Password"
+                android:textColorHint="#AAAAAA"
+                app:passwordToggleEnabled="true"
+                xmlns:app="http://schemas.android.com/apk/res-auto"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/passwordInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword"
+                    android:textColor="@color/white"
+                    android:textSize="16sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Error message text (hidden by default) -->
+            <TextView
+                android:id="@+id/errorText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FF6B6B"
+                android:textSize="14sp"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Login button -->
+            <Button
+                android:id="@+id/loginButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="LOG IN"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:backgroundTint="@color/primary"
+                android:textColor="@color/white"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Loading indicator (hidden by default) -->
+            <ProgressBar
+                android:id="@+id/loadingBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Register link -->
+            <TextView
+                android:id="@+id/registerLink"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Don't have an account? Register"
+                android:textColor="#BBDEFB"
+                android:textSize="16sp"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="8dp" />
+
+            <!-- Spacer to push content up a bit -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout>

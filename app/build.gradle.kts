@@ -62,6 +62,9 @@ dependencies {
     // Firebase Analytics — basic usage tracking (required by Firebase)
     implementation("com.google.firebase:firebase-analytics")
 
+    // Firebase Authentication — login/register with email + password
+    implementation("com.google.firebase:firebase-auth")
+
     // Firebase Realtime Database — this is how our app talks to the Python backend
     implementation("com.google.firebase:firebase-database")
 

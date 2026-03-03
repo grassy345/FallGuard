@@ -5,25 +5,27 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.google.firebase.auth.FirebaseAuth
 
 /**
  * BootReceiver — Auto-starts FallGuard when the phone restarts.
  *
- * Without this, the caregiver would have to manually open the app
- * every time their phone restarts. That's dangerous — they might
- * forget, and miss a fall alert!
- *
- * How it works:
- * 1. Android sends a BOOT_COMPLETED broadcast when the phone finishes starting up
- * 2. This receiver catches that broadcast
- * 3. It starts the FallDetectionService automatically
+ * Only starts the service if a user is logged in!
+ * If the user logged out before the phone restarted, the service
+ * stays off until they log in again.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            Log.d("BootReceiver", "Phone restarted — starting FallGuard monitoring service")
-            val serviceIntent = Intent(context, FallDetectionService::class.java)
-            ContextCompat.startForegroundService(context, serviceIntent)
+            // Only start the service if a user is logged in
+            val currentUser = FirebaseAuth.getInstance().currentUser
+            if (currentUser != null && currentUser.isEmailVerified) {
+                Log.d("BootReceiver", "Phone restarted — user is logged in, starting monitoring service")
+                val serviceIntent = Intent(context, FallDetectionService::class.java)
+                ContextCompat.startForegroundService(context, serviceIntent)
+            } else {
+                Log.d("BootReceiver", "Phone restarted — no user logged in, skipping service start")
+            }
         }
     }
 }
