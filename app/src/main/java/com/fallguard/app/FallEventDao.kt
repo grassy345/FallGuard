@@ -33,4 +33,8 @@ interface FallEventDao {
     /** Get the most recent event (to update its clipUrl when it arrives). */
     @Query("SELECT * FROM fall_events ORDER BY savedAt DESC LIMIT 1")
     suspend fun getMostRecent(): FallEvent?
+
+    /** Delete a specific event by ID (dev feature). */
+    @Query("DELETE FROM fall_events WHERE id = :eventId")
+    suspend fun deleteById(eventId: Long)
 }

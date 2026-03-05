@@ -109,7 +109,8 @@ class MainActivity : AppCompatActivity() {
 
         adapter = FallEventAdapter(
             onThumbnailClick = { event -> openVideoPlayer(event) },
-            onSaveClick = { event -> saveVideo(event) }
+            onSaveClick = { event -> saveVideo(event) },
+            onLongPress = { event -> confirmDeleteEvent(event) }
         )
         recyclerView.adapter = adapter
 
@@ -199,6 +200,23 @@ class MainActivity : AppCompatActivity() {
             putExtra("fall_status", event.fallStatus)
         }
         startActivity(intent)
+    }
+
+    /** Long-press delete: shows confirmation, then removes event from Room DB */
+    private fun confirmDeleteEvent(event: FallEvent) {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Delete Event")
+            .setMessage("Delete this fall event?\n${event.fallStatus} — ${event.timestamp}")
+            .setPositiveButton("Delete") { _, _ ->
+                CoroutineScope(Dispatchers.IO).launch {
+                    FallDatabase.getInstance(this@MainActivity).fallEventDao().deleteById(event.id)
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Event deleted", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     /** Download and save the video to the configured save location */

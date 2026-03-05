@@ -32,7 +32,8 @@ import java.util.Locale
  */
 class FallEventAdapter(
     private val onThumbnailClick: (FallEvent) -> Unit,
-    private val onSaveClick: (FallEvent) -> Unit
+    private val onSaveClick: (FallEvent) -> Unit,
+    private val onLongPress: ((FallEvent) -> Unit)? = null
 ) : ListAdapter<FallEvent, FallEventAdapter.ViewHolder>(DiffCallback) {
 
     companion object {
@@ -68,6 +69,12 @@ class FallEventAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val event = getItem(position)
         val context = holder.itemView.context
+
+        // Long-press: delete card (dev feature)
+        holder.itemView.setOnLongClickListener {
+            onLongPress?.invoke(event)
+            true
+        }
 
         // Color strip: red for FALL_DETECTED, amber for SUSPICIOUS
         val stripColor = if (event.fallStatus == "FALL_DETECTED")
