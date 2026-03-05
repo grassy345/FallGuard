@@ -256,8 +256,15 @@ class FallDetectionService : Service() {
         Log.d(TAG, "AlarmActivity launched directly for: $alertType")
 
         // Step 4: Post a QUIET notification in the tray (reference only, no sound, no heads-up)
+        // Tapping opens the DASHBOARD (not the alarm) and highlights the matching card
+        val dashboardIntent = Intent(this, MainActivity::class.java).apply {
+            putExtra("highlight_timestamp", timestamp)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
         val tapIntent = PendingIntent.getActivity(
-            this, 0, alarmIntent,
+            this, ALERT_NOTIFICATION_ID, dashboardIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
