@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- video_player_menu.xml — Video player toolbar menu (save/download icon) -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_save"
+        android:icon="@android:drawable/stat_sys_download"
+        android:title="Save Video"
+        app:showAsAction="always"
+        app:iconTint="@color/white" />
+</menu>

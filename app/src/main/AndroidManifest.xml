@@ -80,6 +80,24 @@
             android:launchMode="singleTop"
             android:excludeFromRecents="true" />
 
+        <!-- === FULL HISTORY SCREEN === -->
+        <activity
+            android:name=".FullHistoryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.FallGuard.DarkStatusBar" />
+
+        <!-- === VIDEO PLAYER SCREEN === -->
+        <activity
+            android:name=".VideoPlayerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.FallGuard.Alarm" />
+
+        <!-- === SETTINGS SCREEN === -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.FallGuard.DarkStatusBar" />
+
         <!-- === BACKGROUND MONITORING SERVICE === -->
         <!-- This runs silently in the background, listening for fall alerts -->
         <service

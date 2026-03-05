@@ -164,9 +164,15 @@ class AlarmActivity : AppCompatActivity() {
             // Request DND access to bypass Do Not Disturb
             requestDndOverride()
 
-            // Get the default alarm sound from the phone
-            val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            // Get alarm tone: check settings for custom tone, otherwise use default
+            val prefs = getSharedPreferences("fallguard_settings", MODE_PRIVATE)
+            val customToneUri = prefs.getString("alarm_tone_uri", null)
+            val alarmUri = if (customToneUri != null) {
+                android.net.Uri.parse(customToneUri)
+            } else {
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            }
 
             // Create and start the media player
             mediaPlayer = MediaPlayer().apply {

@@ -9,6 +9,12 @@
         <item name="android:statusBarColor">@color/primary_dark</item>
     </style>
 
+    <!-- Sub-activity theme — same as main but forces dark status bar with white icons -->
+    <!-- Used by Settings, FullHistory, etc. where DrawerLayout isn't present -->
+    <style name="Theme.FallGuard.DarkStatusBar" parent="Theme.FallGuard">
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
     <!-- Alarm theme — fullscreen, no action bar, immersive -->
     <!-- Used by AlarmActivity for the emergency alarm screen -->
     <style name="Theme.FallGuard.Alarm" parent="Theme.MaterialComponents.NoActionBar">

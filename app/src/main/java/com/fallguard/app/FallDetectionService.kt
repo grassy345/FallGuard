@@ -14,6 +14,9 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -189,10 +192,12 @@ class FallDetectionService : Service() {
                 when (fallStatus) {
                     "FALL_DETECTED" -> {
                         Log.w(TAG, "🚨 FALL DETECTED! Launching AlarmActivity!")
+                        saveEventToRoom("FALL_DETECTED", timestamp ?: "")
                         launchAlarmActivity("FALL_DETECTED", timestamp ?: "")
                     }
                     "SUSPICIOUS" -> {
                         Log.w(TAG, "⚠️ SUSPICIOUS activity! Launching AlarmActivity!")
+                        saveEventToRoom("SUSPICIOUS", timestamp ?: "")
                         launchAlarmActivity("SUSPICIOUS", timestamp ?: "")
                     }
                     "NORMAL" -> {
@@ -202,6 +207,12 @@ class FallDetectionService : Service() {
                     else -> {
                         Log.d(TAG, "Unknown status: $fallStatus")
                     }
+                }
+
+                // Check for clip_url and update Room record
+                val clipUrl = snapshot.child("clip_url").getValue(String::class.java)
+                if (!clipUrl.isNullOrEmpty()) {
+                    updateClipUrlInRoom(clipUrl)
                 }
             }
 
@@ -278,6 +289,48 @@ class FallDetectionService : Service() {
             if (date != null) outputFormat.format(date).uppercase() else timestamp
         } catch (e: Exception) {
             timestamp  // Fallback to raw timestamp
+        }
+    }
+
+    /**
+     * Saves a fall event to the local Room database.
+     * Called when FALL_DETECTED or SUSPICIOUS is received.
+     * clipUrl will be updated later when it arrives.
+     */
+    private fun saveEventToRoom(fallStatus: String, timestamp: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val dao = FallDatabase.getInstance(applicationContext).fallEventDao()
+                val event = FallEvent(
+                    fallStatus = fallStatus,
+                    timestamp = timestamp,
+                    acknowledged = false,
+                    clipUrl = null
+                )
+                val id = dao.insert(event)
+                Log.d(TAG, "Saved fall event to Room DB with ID: $id")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save event to Room: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Updates the clip URL on the most recent fall event in Room DB.
+     * Called when clip_url appears/changes in RTDB (a few seconds after fall detection).
+     */
+    private fun updateClipUrlInRoom(clipUrl: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val dao = FallDatabase.getInstance(applicationContext).fallEventDao()
+                val mostRecent = dao.getMostRecent()
+                if (mostRecent != null && mostRecent.clipUrl != clipUrl) {
+                    dao.updateClipUrl(mostRecent.id, clipUrl)
+                    Log.d(TAG, "Updated clip URL for event ${mostRecent.id}: $clipUrl")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to update clip URL: ${e.message}")
+            }
         }
     }
 

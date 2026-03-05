@@ -7,32 +7,49 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
+import android.util.Log
+import android.view.MenuItem
+import android.view.View
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.drawerlayout.widget.DrawerLayout
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.navigation.NavigationView
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
+import java.net.URL
 
 /**
- * MainActivity — The main dashboard of FallGuard.
+ * MainActivity — The FallGuard Dashboard.
  *
- * What it does:
- * 1. Checks if user is logged in — if not, redirects to LoginActivity
- * 2. Starts the background monitoring service
- * 3. Requests necessary permissions
- * 4. Shows user email and monitoring status
- * 5. Provides logout functionality
+ * Shows a toolbar with drawer, monitoring status, and a list of
+ * recent fall events as compact cards with video thumbnails.
  */
 class MainActivity : AppCompatActivity() {
 
     companion object {
+        private const val TAG = "MainActivity"
         private const val NOTIFICATION_PERMISSION_CODE = 100
     }
 
     private lateinit var auth: FirebaseAuth
+    private lateinit var drawerLayout: DrawerLayout
+    private lateinit var adapter: FallEventAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,29 +65,183 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
-        // Step 1: Request permissions
+        // Set up Toolbar
+        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+
+        // Set up Drawer
+        drawerLayout = findViewById(R.id.drawerLayout)
+        val toggle = ActionBarDrawerToggle(
+            this, drawerLayout, toolbar,
+            R.string.app_name, R.string.app_name
+        )
+        drawerLayout.addDrawerListener(toggle)
+        toggle.syncState()
+        toggle.drawerArrowDrawable.color = ContextCompat.getColor(this, R.color.white)
+
+        // Set up NavigationView
+        val navigationView = findViewById<NavigationView>(R.id.navigationView)
+        setupDrawer(navigationView)
+
+        // Fix drawer header: add top padding equal to status bar height
+        // so the app icon/text doesn't go behind the system status bar
+        val headerView = navigationView.getHeaderView(0)
+        val statusBarHeight = getStatusBarHeight()
+        headerView.setPadding(
+            headerView.paddingLeft,
+            headerView.paddingTop + statusBarHeight,
+            headerView.paddingRight,
+            headerView.paddingBottom
+        )
+
+        // Keep status bar dark when drawer is open
+        drawerLayout.setStatusBarBackgroundColor(
+            ContextCompat.getColor(this, R.color.primary_dark)
+        )
+
+        // Show user email in status bar
+        val userEmailBadge = findViewById<TextView>(R.id.userEmailBadge)
+        userEmailBadge.text = auth.currentUser?.email ?: ""
+
+        // Set up RecyclerView
+        val recyclerView = findViewById<RecyclerView>(R.id.fallEventsRecycler)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+
+        adapter = FallEventAdapter(
+            onThumbnailClick = { event -> openVideoPlayer(event) },
+            onSaveClick = { event -> saveVideo(event) }
+        )
+        recyclerView.adapter = adapter
+
+        // Observe fall events from Room database (LiveData = auto-refresh!)
+        val dao = FallDatabase.getInstance(this).fallEventDao()
+        dao.getLatest10().observe(this) { events ->
+            val emptyState = findViewById<LinearLayout>(R.id.emptyState)
+            val moreButton = findViewById<Button>(R.id.moreButton)
+
+            if (events.isEmpty()) {
+                recyclerView.visibility = View.GONE
+                emptyState.visibility = View.VISIBLE
+                moreButton.visibility = View.GONE
+            } else {
+                recyclerView.visibility = View.VISIBLE
+                emptyState.visibility = View.GONE
+                adapter.submitList(events)
+
+                // Show MORE button if there are 10 items (could be more in DB)
+                moreButton.visibility = if (events.size >= 10) View.VISIBLE else View.GONE
+            }
+        }
+
+        // MORE button → full history
+        val moreButton = findViewById<Button>(R.id.moreButton)
+        moreButton.setOnClickListener {
+            startActivity(Intent(this, FullHistoryActivity::class.java))
+        }
+
+        // Request permissions and start service
         requestNotificationPermission()
         requestDndPermission()
         requestOverlayPermission()
         requestBatteryOptimizationExemption()
-
-        // Step 2: Start the background monitoring service
         startFallDetectionService()
+    }
 
-        // Step 3: Show user info and status
-        val userEmail = findViewById<TextView>(R.id.userEmail)
-        userEmail.text = "Logged in as: ${auth.currentUser?.email}"
+    /** Handle toolbar menu clicks (settings gear) */
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_settings -> {
+                startActivity(Intent(this, SettingsActivity::class.java))
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
 
-        val statusText = findViewById<TextView>(R.id.statusText)
-        statusText.text = "✅ Monitoring Active\n\nFallGuard is listening for alerts.\nYou can close this app — monitoring continues in the background."
+    /** Set up the navigation drawer with menu items */
+    private fun setupDrawer(navigationView: NavigationView) {
+        // Set user email in drawer header
+        val headerView = navigationView.getHeaderView(0)
+        val drawerEmail = headerView.findViewById<TextView>(R.id.drawerUserEmail)
+        drawerEmail.text = auth.currentUser?.email ?: ""
 
-        // Step 4: Set up logout button
-        val logoutButton = findViewById<Button>(R.id.logoutButton)
-        logoutButton.setOnClickListener {
-            // Stop the monitoring service FIRST, then sign out
-            stopService(Intent(this, FallDetectionService::class.java))
-            auth.signOut()
-            navigateToLogin()
+        navigationView.setNavigationItemSelectedListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.nav_settings -> {
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                }
+                R.id.nav_github -> {
+                    val intent = Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://github.com/grassy345/FallGuard"))
+                    startActivity(intent)
+                }
+                R.id.nav_logout -> {
+                    // Stop service, sign out, navigate to login
+                    stopService(Intent(this, FallDetectionService::class.java))
+                    auth.signOut()
+                    navigateToLogin()
+                }
+            }
+            drawerLayout.closeDrawers()
+            true
+        }
+    }
+
+    /** Launch the video player for a fall event */
+    private fun openVideoPlayer(event: FallEvent) {
+        if (event.clipUrl.isNullOrEmpty()) {
+            Toast.makeText(this, "Video not yet available", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val intent = Intent(this, VideoPlayerActivity::class.java).apply {
+            putExtra("clip_url", event.clipUrl)
+            putExtra("timestamp", event.timestamp)
+            putExtra("fall_status", event.fallStatus)
+        }
+        startActivity(intent)
+    }
+
+    /** Download and save the video to the configured save location */
+    private fun saveVideo(event: FallEvent) {
+        if (event.clipUrl.isNullOrEmpty()) {
+            Toast.makeText(this, "Video not yet available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val prefs = getSharedPreferences("fallguard_settings", MODE_PRIVATE)
+        val saveDir = prefs.getString("save_location", null)
+            ?: File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOWNLOADS), "FallGuard").absolutePath
+
+        // Create filename from timestamp: "Fall_01-03-2026_03-01-37_PM.mp4"
+        val fileName = "Fall_${event.timestamp.replace(":", "-").replace(" ", "_")}.mp4"
+        val targetFile = File(saveDir, fileName)
+
+        Toast.makeText(this, "Downloading video...", Toast.LENGTH_SHORT).show()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                File(saveDir).mkdirs()
+                val connection = URL(event.clipUrl).openConnection()
+                connection.connect()
+                val input = connection.getInputStream()
+                val output = FileOutputStream(targetFile)
+                input.copyTo(output)
+                output.close()
+                input.close()
+
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity,
+                        "Video saved to: ${targetFile.name}", Toast.LENGTH_LONG).show()
+                }
+                Log.d(TAG, "Video saved: ${targetFile.absolutePath}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save video: ${e.message}")
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity,
+                        "Failed to save video: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
@@ -108,15 +279,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Asks for SYSTEM_ALERT_WINDOW permission (display over other apps).
-     * Required on Android 10+ so the alarm activity can appear over any app.
-     */
     private fun requestOverlayPermission() {
         if (!Settings.canDrawOverlays(this)) {
             val intent = Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                android.net.Uri.parse("package:$packageName")
+                Uri.parse("package:$packageName")
             )
             startActivity(intent)
         }
@@ -130,5 +297,11 @@ class MainActivity : AppCompatActivity() {
             }
             startActivity(intent)
         }
+    }
+
+    /** Get the system status bar height in pixels */
+    private fun getStatusBarHeight(): Int {
+        val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (resourceId > 0) resources.getDimensionPixelSize(resourceId) else 0
     }
 }

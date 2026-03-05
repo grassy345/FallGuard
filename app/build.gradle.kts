@@ -13,6 +13,9 @@ plugins {
 
     // "Connect this app to Firebase"
     id("com.google.gms.google-services")
+
+    // Kotlin annotation processing — needed by Room database and Glide
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -48,26 +51,34 @@ android {
 
 dependencies {
     // === Android Core Libraries ===
-    // These are the basic building blocks every Android app needs
-
-    implementation("androidx.core:core-ktx:1.15.0")          // Kotlin extensions for Android
-    implementation("androidx.appcompat:appcompat:1.7.0")      // Backward compatibility
-    implementation("com.google.android.material:material:1.12.0")  // Material Design UI components
+    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("com.google.android.material:material:1.12.0")
 
     // === Firebase ===
-    // Firebase BOM (Bill of Materials) ensures all Firebase libraries use compatible versions
-    // Think of BOM as a "package deal" — it keeps all Firebase versions in sync
     implementation(platform("com.google.firebase:firebase-bom:34.9.0"))
-
-    // Firebase Analytics — basic usage tracking (required by Firebase)
     implementation("com.google.firebase:firebase-analytics")
-
-    // Firebase Authentication — login/register with email + password
     implementation("com.google.firebase:firebase-auth")
-
-    // Firebase Realtime Database — this is how our app talks to the Python backend
     implementation("com.google.firebase:firebase-database")
-
-    // Firebase Cloud Messaging — for push notifications (used in Feature 2)
     implementation("com.google.firebase:firebase-messaging")
+
+    // === Room Database — local storage for fall event history ===
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")       // Kotlin coroutines support
+    ksp("androidx.room:room-compiler:$roomVersion")              // Annotation processor
+
+    // === Lifecycle — LiveData for auto-refreshing UI ===
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.7")
+
+    // === Glide — loads images/video thumbnails from URLs ===
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    ksp("com.github.bumptech.glide:ksp:4.16.0")
+
+    // === ExoPlayer (Media3) — in-app video playback ===
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-ui:1.5.1")
+
+    // === DrawerLayout — navigation drawer ===
+    implementation("androidx.drawerlayout:drawerlayout:1.2.0")
 }

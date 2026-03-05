@@ -9,6 +9,9 @@ plugins {
     // Kotlin language support for Android
     id("org.jetbrains.kotlin.android") version "2.1.0" apply false
 
+    // KSP — Kotlin Symbol Processing (annotation processor for Room, Glide, etc.)
+    id("com.google.devtools.ksp") version "2.1.0-1.0.29" apply false
+
     // Google Services plugin — connects our app to Firebase
     id("com.google.gms.google-services") version "4.4.4" apply false
 }
