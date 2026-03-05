@@ -130,6 +130,9 @@ class MainActivity : AppCompatActivity() {
 
                 // Show MORE button if there are 10 items (could be more in DB)
                 moreButton.visibility = if (events.size >= 10) View.VISIBLE else View.GONE
+
+                // Check if we need to highlight a specific card (from notification tap)
+                checkAndHighlightCard(recyclerView, events)
             }
         }
 
@@ -145,6 +148,51 @@ class MainActivity : AppCompatActivity() {
         requestOverlayPermission()
         requestBatteryOptimizationExemption()
         startFallDetectionService()
+    }
+
+    /** Handle notification taps when activity is already running */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val recyclerView = findViewById<RecyclerView>(R.id.fallEventsRecycler)
+        checkAndHighlightCard(recyclerView, adapter.currentList)
+    }
+
+    /** Scroll to and blink-highlight the card matching the notification timestamp */
+    private fun checkAndHighlightCard(recyclerView: RecyclerView, events: List<FallEvent>) {
+        val highlightTimestamp = intent.getStringExtra("highlight_timestamp") ?: return
+
+        val index = events.indexOfFirst { it.timestamp == highlightTimestamp }
+        if (index >= 0) {
+            recyclerView.scrollToPosition(index)
+
+            recyclerView.post {
+                val viewHolder = recyclerView.findViewHolderForAdapterPosition(index)
+                viewHolder?.itemView?.let { card -> blinkHighlight(card) }
+            }
+
+            intent.removeExtra("highlight_timestamp")
+        }
+    }
+
+    /** Blink the card 2 times with a yellow highlight flash */
+    private fun blinkHighlight(view: View) {
+        val highlight = android.graphics.drawable.ColorDrawable(
+            ContextCompat.getColor(this, R.color.alert_amber)
+        )
+        val original = view.background
+
+        val blink = object : android.os.CountDownTimer(1200, 300) {
+            var count = 0
+            override fun onTick(millisUntilFinished: Long) {
+                view.background = if (count % 2 == 0) highlight else original
+                count++
+            }
+            override fun onFinish() {
+                view.background = original
+            }
+        }
+        blink.start()
     }
 
     /** Handle toolbar menu clicks (settings gear) */
