@@ -182,10 +182,28 @@ class AlarmActivity : AppCompatActivity() {
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )
-                setDataSource(this@AlarmActivity, alarmUri)
-                isLooping = true  // Keep playing until acknowledged!
-                prepare()
-                start()
+                try {
+                    setDataSource(this@AlarmActivity, alarmUri)
+                    isLooping = true  // Keep playing until acknowledged!
+                    prepare()
+                    start()
+                } catch (e: Exception) {
+                    // Custom tone failed — fall back to system default alarm
+                    Log.e(TAG, "Custom tone failed (${e.message}), falling back to default")
+                    reset()
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    val fallbackUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                    setDataSource(this@AlarmActivity, fallbackUri)
+                    isLooping = true
+                    prepare()
+                    start()
+                }
             }
 
             Log.d(TAG, "Alarm sound started at max volume")

@@ -59,12 +59,12 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    // Custom .mp3 file picker result
+    // Custom .mp3 file picker result — uses OpenDocument for persistable URI
     private val filePicker = registerForActivityResult(
-        ActivityResultContracts.GetContent()
+        ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            // Persist permission so we can access the file later
+            // Persist permission so AlarmActivity can access the file later
             try {
                 contentResolver.takePersistableUriPermission(
                     uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -73,7 +73,7 @@ class SettingsActivity : AppCompatActivity() {
                 Log.w(TAG, "Couldn't take persistable permission: ${e.message}")
             }
 
-            val toneName = "Custom audio file"
+            val toneName = getFileNameFromUri(uri) ?: "Custom audio file"
             getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
                 .putString(KEY_ALARM_TONE_URI, uri.toString())
                 .putString(KEY_ALARM_TONE_NAME, toneName)
@@ -167,7 +167,7 @@ class SettingsActivity : AppCompatActivity() {
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> openSystemTonePicker()
-                    1 -> filePicker.launch("audio/*")
+                    1 -> filePicker.launch(arrayOf("audio/*"))
                 }
             }
             .show()
@@ -195,13 +195,32 @@ class SettingsActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val oldDir = File(oldPath)
-                if (!oldDir.exists() || !oldDir.isDirectory) return@launch
+                Log.d(TAG, "Migration: old=$oldPath, new=$newPath, oldExists=${oldDir.exists()}")
+
+                if (!oldDir.exists() || !oldDir.isDirectory) {
+                    Log.d(TAG, "Migration: source directory doesn't exist, nothing to migrate")
+                    runOnUiThread {
+                        Toast.makeText(this@SettingsActivity,
+                            "No existing video folder found at: $oldPath",
+                            Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
 
                 val videoFiles = oldDir.listFiles { file ->
                     file.name.startsWith("Fall_") && file.extension.equals("mp4", ignoreCase = true)
-                } ?: return@launch
+                } ?: emptyArray()
 
-                if (videoFiles.isEmpty()) return@launch
+                Log.d(TAG, "Migration: found ${videoFiles.size} Fall_*.mp4 files")
+
+                if (videoFiles.isEmpty()) {
+                    runOnUiThread {
+                        Toast.makeText(this@SettingsActivity,
+                            "No FallGuard videos found to migrate",
+                            Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
 
                 val newDir = File(newPath)
                 newDir.mkdirs()
@@ -213,6 +232,7 @@ class SettingsActivity : AppCompatActivity() {
                         file.copyTo(newFile, overwrite = true)
                         file.delete()
                         movedCount++
+                        Log.d(TAG, "Migrated: ${file.name}")
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to move ${file.name}: ${e.message}")
                     }
@@ -245,8 +265,20 @@ class SettingsActivity : AppCompatActivity() {
                     0 -> directoryPicker.launch(null)
                     1 -> {
                         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                        val oldLocation = prefs.getString(KEY_SAVE_LOCATION, null)
+                        val defaultDir = getDefaultSaveDir()
+
+                        // Create default directory if it doesn't exist
+                        File(defaultDir).mkdirs()
+
                         prefs.edit().remove(KEY_SAVE_LOCATION).apply()
-                        findViewById<TextView>(R.id.currentSaveLocation).text = getDefaultSaveDir()
+                        findViewById<TextView>(R.id.currentSaveLocation).text = defaultDir
+
+                        // Migrate videos from old location to default
+                        if (oldLocation != null && oldLocation != defaultDir) {
+                            migrateVideos(oldLocation, defaultDir)
+                        }
+
                         Toast.makeText(this, "Reset to default save location", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -276,6 +308,21 @@ class SettingsActivity : AppCompatActivity() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get file path from URI: ${e.message}")
+            null
+        }
+    }
+
+    /** Extract the display name (filename) from a content URI */
+    private fun getFileNameFromUri(uri: Uri): String? {
+        return try {
+            val cursor = contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) it.getString(nameIndex) else null
+                } else null
+            }
+        } catch (e: Exception) {
             null
         }
     }
